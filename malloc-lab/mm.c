@@ -198,7 +198,6 @@ static void delete_free_list(void *bp)
  */
 void *mm_malloc(size_t size)
 {
-    //mm_check(0);
     size_t asize;
     size_t extendsize;
     char *bp;
@@ -224,7 +223,6 @@ void *mm_malloc(size_t size)
         return NULL;
     }
     place(bp,asize);
-    //mm_check(1);
     return bp;
 }
 
@@ -233,12 +231,10 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *ptr)
 {
-    //mm_check(0);
     size_t size = GET_SIZE(HDRP(ptr));
     PUT(HDRP(ptr), PACK(size, 0));
     PUT(FTRP(ptr), PACK(size, 0));
     coalesce(ptr);
-    //mm_check(1);
 }
 
 static void *find_fit(size_t asize)
@@ -285,8 +281,8 @@ static void place(void *bp, size_t asize)
 
 void *mm_realloc(void *ptr, size_t size)
 {
-    void *oldptr = ptr;
-    size_t old_blk_size = GET_SIZE(HDRP(oldptr));
+    void *old_ptr = ptr;
+    size_t old_blk_size = GET_SIZE(HDRP(old_ptr));
     size_t old_payload_size = old_blk_size - DSIZE;
     
     size_t asize;
@@ -298,42 +294,50 @@ void *mm_realloc(void *ptr, size_t size)
 
     //1.사이즈 줄이는 경우
     if (asize <= old_payload_size) {
-        return oldptr;
+        return old_ptr;
     }
 
     //2.다음 블록 병합이 가능한 경우 처리        
-    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(oldptr)));
-    size_t next_blk_size = GET_SIZE(HDRP(NEXT_BLKP(oldptr)));
+    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(old_ptr)));
+    size_t next_blk_size = GET_SIZE(HDRP(NEXT_BLKP(old_ptr)));
     size_t add_size = old_blk_size + next_blk_size;    
 
     //미할당 + realloc 사이즈 < 합친블록 사이즈 
+    // if (!next_alloc && asize <= add_size) {
+    //     //합친블록 사이즈만큼 블록을 미할당으로 합치고
+    //     delete_free_list(NEXT_BLKP(old_ptr));
+    //     PUT(HDRP(old_ptr), PACK(add_size,0));
+    //     PUT(FTRP(old_ptr), PACK(add_size,0));
+
+    //     //최소 블록 사이즈보다 크면 분할
+    //     if ((add_size - asize) >= MINIBLOCK) {
+    //         // 할당
+    //         PUT(HDRP(old_ptr), PACK(asize,1));
+    //         PUT(FTRP(old_ptr), PACK(asize,1));
+    //         // 분할
+    //         PUT(HDRP(NEXT_BLKP(old_ptr)), PACK(add_size - asize,0));
+    //         PUT(FTRP(NEXT_BLKP(old_ptr)), PACK(add_size - asize,0));
+    //         insert_free_list(NEXT_BLKP(old_ptr));    //분할된 가용 블록을 연결리스트에 삽입
+    //     } else {
+    //         // 아니면 전체 할당(약간의 내부단편화)
+    //         PUT(HDRP(old_ptr), PACK(add_size,1));
+    //         PUT(FTRP(old_ptr), PACK(add_size,1));   
+    //     }
+    //     return old_ptr;
+    // }
+
     if (!next_alloc && asize <= add_size) {
         //합친블록 사이즈만큼 블록을 미할당으로 합치고
-        delete_free_list(NEXT_BLKP(oldptr));
-        PUT(HDRP(oldptr), PACK(add_size,0));
-        PUT(FTRP(oldptr), PACK(add_size,0));
-
-        //최소 블록 사이즈보다 크면 분할
-        if ((add_size - asize) >= MINIBLOCK) {
-            // 할당
-            PUT(HDRP(oldptr), PACK(asize,1));
-            PUT(FTRP(oldptr), PACK(asize,1));
-            // 분할
-            PUT(HDRP(NEXT_BLKP(oldptr)), PACK(add_size - asize,0));
-            PUT(FTRP(NEXT_BLKP(oldptr)), PACK(add_size - asize,0));
-            insert_free_list(NEXT_BLKP(oldptr));    //분할된 가용 블록을 연결리스트에 삽입
-        } else {
-            // 아니면 전체 할당(약간의 내부단편화)
-            PUT(HDRP(oldptr), PACK(add_size,1));
-            PUT(FTRP(oldptr), PACK(add_size,1));   
-        }
-        return oldptr;
-    }
+        delete_free_list(NEXT_BLKP(old_ptr));
+        PUT(HDRP(old_ptr), PACK(add_size,1));
+        PUT(FTRP(old_ptr), PACK(add_size,1));
+        return old_ptr;
+    }    
 
     // 새로 할당
-    void *newPtr;
-    newPtr = mm_malloc(size);
-    if (newPtr == NULL) {
+    void *new_ptr;
+    new_ptr = mm_malloc(size);
+    if (new_ptr == NULL) {
         return NULL;
     }
 
@@ -343,10 +347,9 @@ void *mm_realloc(void *ptr, size_t size)
     }
 
     // 새 블록으로 데이터 복사
-    memcpy(newPtr, ptr, copySize);
+    memcpy(new_ptr, ptr, copySize);
     // 기존 블록 반환
     mm_free(ptr);
-    //mm_check(1);
-    return newPtr;
+    return new_ptr;
     
 }
