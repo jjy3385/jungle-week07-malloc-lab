@@ -193,10 +193,10 @@ static void delete_free_list(void *bp) {
   PRED(bp) = SUCC(bp) = NULL;
 }
 
-// 어떤 클래스에 해당되는지 인덱스 찾는 함수
+/* 연결리스트 인덱스 */
 static int get_list_index(size_t asize) {
   int i = 0;
-  // 📌 최소 클래스 크기는 16바이트(32,64,128,256,512.... 이렇게 나갈 수 있게)
+  // 16바이트부터 시작
   size_t size = 2 * DSIZE;
   while (i < SEG_LIST_SIZE - 1 && asize > size) {
     size <<= 1;
